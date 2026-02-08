@@ -1,0 +1,188 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id         String   @id @default(cuid())
+  email      String   @unique
+  passwordHash String @map("password_hash")
+  name       String
+  role       UserRole @default(employee)
+  teamId     String?  @map("team_id")
+  workModeId String?  @map("work_mode_id")
+  active     Boolean  @default(true)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  workMode  WorkMode?  @relation(fields: [workModeId], references: [id], onDelete: SetNull)
+  commitments    WeeklyCommitment[]
+  workLogs       WorkLog[]
+  reviews        WeeklyReview[]
+  subtasksAssigned Subtask[]
+  taskAssignments TaskAssignment[]
+}
+
+enum UserRole {
+  admin
+  employee
+}
+
+model Team {
+  id        String   @id @default(cuid())
+  name      String
+  code      String?  @unique
+  settings  Json?    // optional future team-level config
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users User[]
+}
+
+model WorkMode {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+  sortOrder Int  @default(0) @map("sort_order")
+
+  users   User[]
+  workLogs WorkLog[]
+}
+
+model ProofType {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  active      Boolean  @default(true)
+  maxSizeMb   Float?   @map("max_size_mb")
+  allowedMime String?  @map("allowed_mime") // comma-separated MIME types
+  sortOrder   Int      @default(0) @map("sort_order")
+
+  proofItems ProofItem[]
+}
+
+model WeekDefinition {
+  id                String @id @default(cuid())
+  startWeekDay      Int    @map("start_week_day") // 0=Sunday, 1=Monday, ...
+  commitmentDueDay  Int    @map("commitment_due_day")
+  reviewDueDay      Int    @map("review_due_day")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+}
+
+model WeeklyCommitment {
+  id               String   @id @default(cuid())
+  userId           String   @map("user_id")
+  weekStartDate    DateTime @map("week_start_date") // date of week start (e.g. Monday)
+  successStatement String   @map("success_statement")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, weekStartDate])
+  @@map("weekly_commitments")
+}
+
+model WorkLog {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  date        DateTime @db.Date
+  workTypeId  String   @map("work_type_id")
+  description String
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workType   WorkMode    @relation(fields: [workTypeId], references: [id], onDelete: Restrict)
+  proofItems ProofItem[]
+
+  @@map("work_logs")
+}
+
+model ProofItem {
+  id        String   @id @default(cuid())
+  workLogId String   @map("work_log_id")
+  proofTypeId String @map("proof_type_id")
+  url       String   // storage URL or file key
+  caption   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  workLog   WorkLog   @relation(fields: [workLogId], references: [id], onDelete: Cascade)
+  proofType ProofType @relation(fields: [proofTypeId], references: [id], onDelete: Restrict)
+
+  @@map("proof_items")
+}
+
+model WeeklyReview {
+  id                 String   @id @default(cuid())
+  userId             String   @map("user_id")
+  weekStartDate      DateTime @map("week_start_date")
+  commitmentAchieved Boolean  @map("commitment_achieved")
+  reasonIfNo         String?  @map("reason_if_no")
+  submittedAt        DateTime @default(now()) @map("submitted_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, weekStartDate])
+  @@map("weekly_reviews")
+}
+
+// --- Tasks: Milestone > Task > Subtask; assign task (whole) or subtasks to people ---
+
+model Milestone {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  dueDate     DateTime? @map("due_date") @db.Date
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  tasks Task[]
+  @@map("milestones")
+}
+
+model Task {
+  id           String    @id @default(cuid())
+  milestoneId  String?   @map("milestone_id")
+  title        String
+  description  String?
+  dueDate      DateTime? @map("due_date") @db.Date
+  sortOrder    Int       @default(0) @map("sort_order")
+  createdAt    DateTime  @default(now()) @map("created_at")
+
+  milestone   Milestone?       @relation(fields: [milestoneId], references: [id], onDelete: SetNull)
+  subtasks    Subtask[]
+  assignments TaskAssignment[]
+  @@map("tasks")
+}
+
+model Subtask {
+  id               String     @id @default(cuid())
+  taskId           String     @map("task_id")
+  title            String
+  description      String?
+  sortOrder        Int        @default(0) @map("sort_order")
+  status          SubtaskStatus @default(pending)
+  assignedToUserId String?    @map("assigned_to_user_id")
+  completedAt      DateTime?  @map("completed_at")
+  createdAt        DateTime   @default(now()) @map("created_at")
+
+  task         Task  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignedTo   User? @relation(fields: [assignedToUserId], references: [id], onDelete: SetNull)
+  @@map("subtasks")
+}
+
+enum SubtaskStatus {
+  pending
+  in_progress
+  done
+}
+
+model TaskAssignment {
+  id        String   @id @default(cuid())
+  taskId    String   @map("task_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([taskId, userId])
+  @@map("task_assignments")
+}
