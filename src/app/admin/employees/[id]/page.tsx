@@ -23,6 +23,9 @@ export default async function EmployeeEditPage({ params }: { params: Promise<{ i
           teamId: user.teamId,
           workModeId: user.workModeId,
           active: user.active,
+          workStartTime: user.workStartTime ?? undefined,
+          workEndTime: user.workEndTime ?? undefined,
+          timezone: user.timezone ?? undefined,
         }}
         teams={teams}
         workModes={workModes}

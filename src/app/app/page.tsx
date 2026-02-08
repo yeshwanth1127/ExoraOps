@@ -1,5 +1,7 @@
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
+import { AppHomeAvailability } from "@/components/AppHomeAvailability";
+import { WelcomeWithOnline } from "@/components/WelcomeWithOnline";
 
 export default async function AppHomePage() {
   const session = await getSession();
@@ -13,11 +15,17 @@ export default async function AppHomePage() {
   return (
     <div className="mx-auto max-w-5xl">
       <div className="mb-12 text-center">
-        <h1 className="text-2xl font-bold tracking-tight text-gray-100 md:text-3xl">
-          Welcome, <span className="text-purple-400">{session?.name}</span>
-        </h1>
+        {session?.role === "employee" && session?.name ? (
+          <WelcomeWithOnline name={session.name} />
+        ) : (
+          <h1 className="text-2xl font-bold tracking-tight text-gray-100 md:text-3xl">
+            Welcome, <span className="text-purple-400">{session?.name}</span>
+          </h1>
+        )}
         <p className="mt-2 text-gray-400">Select a module below</p>
       </div>
+
+      {session?.role === "employee" && <AppHomeAvailability />}
 
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
         {modules.map((mod, i) => (

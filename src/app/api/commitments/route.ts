@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { getWeekStartForDate, toDateOnly } from "@/lib/week";
+import { recordStrongActivity } from "@/lib/availability";
 import { z } from "zod";
 
 const bodySchema = z.object({
@@ -51,5 +52,6 @@ export async function POST(request: Request) {
       successStatement: parsed.data.successStatement.trim(),
     },
   });
+  await recordStrongActivity(session.id).catch(() => {});
   return NextResponse.json({ ok: true });
 }

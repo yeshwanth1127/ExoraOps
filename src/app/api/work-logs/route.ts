@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireSession } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { recordStrongActivity } from "@/lib/availability";
 import { z } from "zod";
 
 const proofItemSchema = z.object({
@@ -76,5 +77,6 @@ export async function POST(request: Request) {
       proofItems: { include: { proofType: { select: { id: true, name: true } } } },
     },
   });
+  await recordStrongActivity(session.id).catch(() => {});
   return NextResponse.json(log);
 }

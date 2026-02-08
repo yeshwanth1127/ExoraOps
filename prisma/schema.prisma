@@ -17,6 +17,13 @@ model User {
   workModeId String?  @map("work_mode_id")
   active     Boolean  @default(true)
   createdAt  DateTime @default(now()) @map("created_at")
+  // Work window (per user)
+  workStartTime  String?  @map("work_start_time")   // e.g. "09:00"
+  workEndTime    String?  @map("work_end_time")     // e.g. "17:00"
+  timezone      String?  @default("UTC")            // IANA e.g. "America/New_York"
+  lastSeenAt    DateTime? @map("last_seen_at")
+  availabilityReliabilityScore Float @default(1) @map("availability_reliability_score") // 0-1
+  lastReliabilityAt DateTime? @map("last_reliability_at")
 
   team      Team?      @relation(fields: [teamId], references: [id], onDelete: SetNull)
   workMode  WorkMode?  @relation(fields: [workModeId], references: [id], onDelete: SetNull)
@@ -25,6 +32,10 @@ model User {
   reviews        WeeklyReview[]
   subtasksAssigned Subtask[]
   taskAssignments TaskAssignment[]
+  availabilitySessions AvailabilitySession[]
+  availabilityEvents   AvailabilityEvent[]
+  pingsSent   Ping[]   @relation("PingFrom")
+  pingsReceived Ping[] @relation("PingTo")
 }
 
 enum UserRole {
@@ -185,4 +196,77 @@ model TaskAssignment {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([taskId, userId])
   @@map("task_assignments")
+}
+
+// --- Work & Availability ---
+
+enum AvailabilityState {
+  available
+  soft_away
+  away
+}
+
+enum AvailabilityEventType {
+  start_work
+  strong_activity
+  weak_activity
+  heartbeat
+  state_change
+}
+
+model AvailabilitySession {
+  id          String   @id @default(cuid())
+  userId      String   @map("user_id")
+  date        DateTime @db.Date
+  startedAt   DateTime  @default(now()) @map("started_at")
+  endedAt     DateTime? @map("ended_at")
+  lateStart   Boolean   @default(false) @map("late_start")
+  lastState   AvailabilityState? @map("last_state")
+  lastStateAt DateTime? @map("last_state_at")
+
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  windows  AvailabilityWindow[]
+  events   AvailabilityEvent[]
+
+  @@unique([userId, date])
+  @@map("availability_sessions")
+}
+
+model AvailabilityWindow {
+  id        String   @id @default(cuid())
+  sessionId String  @map("session_id")
+  startsAt  DateTime @map("starts_at")
+  endsAt    DateTime @map("ends_at")
+
+  session AvailabilitySession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@map("availability_windows")
+}
+
+model AvailabilityEvent {
+  id        String   @id @default(cuid())
+  userId    String   @map("user_id")
+  sessionId String?  @map("session_id")
+  type      AvailabilityEventType
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user    User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  session AvailabilitySession? @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+
+  @@map("availability_events")
+}
+
+model Ping {
+  id           String    @id @default(cuid())
+  fromUserId   String    @map("from_user_id")
+  targetUserId String    @map("target_user_id")
+  sentAt       DateTime  @default(now()) @map("sent_at")
+  respondedAt DateTime?  @map("responded_at")
+  missedAt    DateTime?  @map("missed_at")
+  slaMinutes   Int       @map("sla_minutes")
+
+  fromUser   User @relation("PingFrom", fields: [fromUserId], references: [id], onDelete: Cascade)
+  targetUser User @relation("PingTo", fields: [targetUserId], references: [id], onDelete: Cascade)
+
+  @@map("pings")
 }

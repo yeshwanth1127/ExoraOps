@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { getSession } from "@/lib/auth";
 import Link from "next/link";
 import { LogoutButton } from "@/components/LogoutButton";
+import { AppAvailability } from "@/components/AppAvailability";
 
 export default async function AppLayout({
   children,
@@ -40,7 +41,8 @@ export default async function AppLayout({
         >
           EXORA
         </Link>
-        <nav className="flex items-center gap-1">
+        <nav className="relative flex items-center gap-1 flex-wrap">
+          {session.role === "employee" && <AppAvailability />}
           {rightNav.map(({ href, label }) => (
             <Link
               key={href}

@@ -10,6 +10,9 @@ const bodySchema = z.object({
   workModeId: z.string().cuid().nullable().optional(),
   active: z.boolean().optional(),
   password: z.string().min(6).optional(),
+  workStartTime: z.string().max(10).nullable().optional(),
+  workEndTime: z.string().max(10).nullable().optional(),
+  timezone: z.string().max(80).nullable().optional(),
 });
 
 export async function GET(
@@ -37,12 +40,15 @@ export async function PATCH(
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
-  const data: { name?: string; teamId?: string | null; workModeId?: string | null; active?: boolean; passwordHash?: string } = {};
+  const data: Record<string, unknown> = {};
   if (parsed.data.name !== undefined) data.name = parsed.data.name.trim();
   if (parsed.data.teamId !== undefined) data.teamId = parsed.data.teamId;
   if (parsed.data.workModeId !== undefined) data.workModeId = parsed.data.workModeId;
   if (parsed.data.active !== undefined) data.active = parsed.data.active;
   if (parsed.data.password !== undefined) data.passwordHash = await hashPassword(parsed.data.password);
+  if (parsed.data.workStartTime !== undefined) data.workStartTime = parsed.data.workStartTime;
+  if (parsed.data.workEndTime !== undefined) data.workEndTime = parsed.data.workEndTime;
+  if (parsed.data.timezone !== undefined) data.timezone = parsed.data.timezone;
   const user = await prisma.user.update({
     where: { id },
     data,
@@ -53,6 +59,9 @@ export async function PATCH(
       active: true,
       teamId: true,
       workModeId: true,
+      workStartTime: true,
+      workEndTime: true,
+      timezone: true,
       team: { select: { id: true, name: true } },
       workMode: { select: { id: true, name: true } },
     },
